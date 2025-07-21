@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  # Banco de dados PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: hyperv_postgres
+    environment:
+      POSTGRES_DB: hyperv_platform
+      POSTGRES_USER: hyperv_user
+      POSTGRES_PASSWORD: hyperv_password123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - hyperv_network
+
+  # Redis para filas e cache
+  redis:
+    image: redis:7-alpine
+    container_name: hyperv_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - hyperv_network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hyperv_backend
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://hyperv_user:hyperv_password123@postgres:5432/hyperv_platform
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: hyperv_jwt_secret_key_change_in_production
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET}
+      DISCORD_REDIRECT_URI: http://localhost:3000/auth/discord/callback
+      HYPERV_AGENT_URL: http://hyperv-agent:4000
+      FRONTEND_URL: http://localhost:3000
+      PORT: 5000
+    ports:
+      - "5000:5000"
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - hyperv_network
+    restart: unless-stopped
+
+  # Frontend Next.js
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: hyperv_frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:5000
+      NEXT_PUBLIC_SOCKET_URL: http://localhost:5000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - hyperv_network
+    restart: unless-stopped
+
+  # Hyper-V Agent (para ser executado no servidor Windows)
+  # Comentado pois deve rodar no servidor Hyper-V
+  # hyperv-agent:
+  #   build:
+  #     context: ./hyper-v-agent
+  #     dockerfile: Dockerfile
+  #   container_name: hyperv_agent
+  #   environment:
+  #     NODE_ENV: development
+  #     API_URL: http://backend:5000
+  #     HYPERV_HOST: ${HYPERV_HOST}
+  #     HYPERV_USERNAME: ${HYPERV_USERNAME}
+  #     HYPERV_PASSWORD: ${HYPERV_PASSWORD}
+  #     BASE_VM_IMAGE_PATH: ${BASE_VM_IMAGE_PATH}
+  #     VM_SWITCH_NAME: ${VM_SWITCH_NAME}
+  #     PORT: 4000
+  #   ports:
+  #     - "4000:4000"
+  #   volumes:
+  #     - ./hyper-v-agent:/app
+  #     - /app/node_modules
+  #   networks:
+  #     - hyperv_network
+  #   restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  hyperv_network:
+    driver: bridge
