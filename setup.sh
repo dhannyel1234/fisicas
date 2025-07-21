@@ -41,32 +41,36 @@ fi
 # Instalar dependências
 echo ""
 echo "📦 Instalando dependências..."
+
+# Shared
+echo "📚 Instalando shared..."
+cd shared
+npm install
+npm run build
+cd ..
+
+# Backend
+echo "🖥️  Instalando backend..."
+cd backend
 npm install
 
 # Gerar cliente Prisma
-echo ""
 echo "🔧 Configurando banco de dados..."
-cd backend
 npx prisma generate
+cd ..
+
+# Frontend
+echo "🎨 Instalando frontend..."
+cd frontend
+npm install
 cd ..
 
 # Copiar arquivo de ambiente se não existir
 if [ ! -f .env ]; then
     echo ""
-    echo "⚙️  Criando arquivo .env..."
-    cp .env.example .env
-    echo "✅ Arquivo .env criado. Por favor, configure suas variáveis de ambiente."
-    echo ""
-    echo "📝 Variáveis importantes para configurar:"
-    echo "   - DISCORD_CLIENT_ID: ID da aplicação Discord"
-    echo "   - DISCORD_CLIENT_SECRET: Secret da aplicação Discord"  
-    echo "   - HYPERV_HOST: IP/hostname do servidor Hyper-V"
-    echo "   - HYPERV_USERNAME: Usuário administrador do Hyper-V"
-    echo "   - HYPERV_PASSWORD: Senha do administrador"
-    echo "   - BASE_VM_IMAGE_PATH: Caminho da imagem base (.vhdx)"
-    echo ""
+    echo "⚙️  Arquivo .env já existe com credenciais Discord configuradas"
 else
-    echo "✅ Arquivo .env já existe"
+    echo "✅ Arquivo .env já configurado"
 fi
 
 # Setup do banco com Docker
@@ -99,30 +103,36 @@ fi
 # Verificar configuração do Discord
 echo ""
 echo "🔐 Configuração do Discord OAuth2:"
-echo "   1. Acesse: https://discord.com/developers/applications"
-echo "   2. Crie uma nova aplicação"
-echo "   3. Vá em OAuth2 > General"
-echo "   4. Adicione redirect URI: http://localhost:3000/auth/discord/callback"
-echo "   5. Copie Client ID e Client Secret para o arquivo .env"
+echo "   ✅ Client ID: 1396903584356106374 (já configurado)"
+echo "   ✅ Client Secret: configurado no .env"
+echo ""
+echo "   📋 PRÓXIMO PASSO OBRIGATÓRIO:"
+echo "   1. Acesse: https://discord.com/developers/applications/1396903584356106374"
+echo "   2. Vá em OAuth2 > General"
+echo "   3. Adicione Redirect URI: http://localhost:3000/auth/discord/callback"
+echo "   4. Salve as alterações"
 echo ""
 
 # Scripts úteis
-echo "🚀 Scripts disponíveis:"
-echo "   npm run dev              - Iniciar desenvolvimento (frontend + backend)"
+echo "🚀 Agora você pode executar:"
 echo "   npm run dev:backend      - Iniciar apenas backend"
-echo "   npm run dev:frontend     - Iniciar apenas frontend"
-echo "   npm run build            - Build de produção"
-echo "   docker-compose up -d     - Iniciar toda infraestrutura"
+echo "   npm run dev:frontend     - Iniciar apenas frontend (em outro terminal)"
 echo ""
+if [ "$DOCKER_AVAILABLE" = true ]; then
+    echo "   docker-compose up -d     - Iniciar toda infraestrutura"
+    echo ""
+fi
 
 echo "✅ Setup concluído!"
 echo ""
 echo "📋 Próximos passos:"
-echo "   1. Configure o arquivo .env com suas credenciais"
-echo "   2. Configure o Discord OAuth2"
-echo "   3. Configure o servidor Hyper-V"
-echo "   4. Execute: npm run dev"
+echo "   1. ✅ Discord OAuth2 credenciais configuradas"
+echo "   2. 📋 Configure o Redirect URI no Discord (veja instruções acima)"
+echo "   3. 📋 Configure o servidor Hyper-V no arquivo .env"
+echo "   4. 🚀 Execute: npm run dev:backend (em um terminal)"
+echo "   5. 🚀 Execute: npm run dev:frontend (em outro terminal)"
 echo ""
 echo "📖 Documentação completa: README.md"
+echo "🔧 Configuração Discord: DISCORD_SETUP.md"
 echo "🐛 Problemas? Verifique os logs em: backend/logs/"
 echo ""

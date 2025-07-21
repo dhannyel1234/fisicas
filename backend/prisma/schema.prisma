@@ -37,6 +37,8 @@ model User {
   auditLogs       AuditLog[]
   sessions        UserSession[]
 
+  @@index([discordId])
+  @@index([createdAt])
   @@map("users")
 }
 
@@ -94,6 +96,9 @@ model VirtualMachine {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   logs VMLog[]
 
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
   @@map("virtual_machines")
 }
 
@@ -107,6 +112,9 @@ model VMLog {
 
   vm VirtualMachine @relation(fields: [vmId], references: [id], onDelete: Cascade)
 
+  @@index([vmId])
+  @@index([level])
+  @@index([createdAt])
   @@map("vm_logs")
 }
 
@@ -130,6 +138,9 @@ model QueueItem {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, status]) // Um usuário só pode ter um item ativo na fila
+  @@index([userId])
+  @@index([status])
+  @@index([position])
   @@map("queue_items")
 }
 
@@ -150,6 +161,9 @@ model AuditLog {
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
   @@map("audit_logs")
 }
 
@@ -161,6 +175,9 @@ model SystemLog {
   metadata  Json?
   createdAt DateTime @default(now())
 
+  @@index([level])
+  @@index([service])
+  @@index([createdAt])
   @@map("system_logs")
 }
 
@@ -193,6 +210,7 @@ model SystemMetrics {
   averageWaitTime   Int      @default(0) // em minutos
   totalVMsCreated   Int      @default(0)
 
+  @@index([timestamp])
   @@map("system_metrics")
 }
 
@@ -259,27 +277,3 @@ enum LogLevel {
   INFO
   DEBUG
 }
-
-// =============================================================================
-// INDEXES PARA PERFORMANCE
-// =============================================================================
-
-// Index para consultas frequentes
-@@index([User.discordId])
-@@index([User.createdAt])
-@@index([VirtualMachine.userId])
-@@index([VirtualMachine.status])
-@@index([VirtualMachine.createdAt])
-@@index([QueueItem.userId])
-@@index([QueueItem.status])
-@@index([QueueItem.position])
-@@index([AuditLog.userId])
-@@index([AuditLog.action])
-@@index([AuditLog.createdAt])
-@@index([SystemLog.level])
-@@index([SystemLog.service])
-@@index([SystemLog.createdAt])
-@@index([SystemMetrics.timestamp])
-@@index([VMLog.vmId])
-@@index([VMLog.level])
-@@index([VMLog.createdAt])
