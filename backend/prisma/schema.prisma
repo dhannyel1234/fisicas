@@ -1,0 +1,285 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// MODELS DE USUÁRIO E AUTENTICAÇÃO
+// =============================================================================
+
+model User {
+  id            String   @id @default(cuid())
+  discordId     String   @unique
+  username      String
+  discriminator String
+  email         String?
+  avatar        String?
+  isAdmin       Boolean  @default(false)
+  isBanned      Boolean  @default(false)
+  banReason     String?
+  banExpiresAt  DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Preferências do usuário
+  preferences   UserPreferences?
+
+  // Relacionamentos
+  virtualMachines VirtualMachine[]
+  queueItems      QueueItem[]
+  auditLogs       AuditLog[]
+  sessions        UserSession[]
+
+  @@map("users")
+}
+
+model UserPreferences {
+  id            String  @id @default(cuid())
+  userId        String  @unique
+  theme         String  @default("dark") // light, dark
+  notifications Boolean @default(true)
+  autoConnect   Boolean @default(false)
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model UserSession {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  lastUsed  DateTime @default(now())
+  ipAddress String?
+  userAgent String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+// =============================================================================
+// MODELS DE MÁQUINAS VIRTUAIS
+// =============================================================================
+
+model VirtualMachine {
+  id           String    @id @default(cuid())
+  name         String    @unique
+  userId       String
+  hypervId     String?   @unique // ID da VM no Hyper-V
+  status       VMStatus  @default(CREATING)
+  ipAddress    String?
+  rdpPort      Int?
+  vncPort      Int?
+  cpuCores     Int       @default(2)
+  ramMB        Int       @default(4096)
+  diskSizeGB   Int       @default(50)
+  createdAt    DateTime  @default(now())
+  startedAt    DateTime?
+  stoppedAt    DateTime?
+  lastAccessAt DateTime?
+  expiresAt    DateTime?
+  updatedAt    DateTime  @updatedAt
+
+  // Relacionamentos
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs VMLog[]
+
+  @@map("virtual_machines")
+}
+
+model VMLog {
+  id        String   @id @default(cuid())
+  vmId      String
+  level     LogLevel @default(INFO)
+  message   String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  vm VirtualMachine @relation(fields: [vmId], references: [id], onDelete: Cascade)
+
+  @@map("vm_logs")
+}
+
+// =============================================================================
+// MODELS DE FILA
+// =============================================================================
+
+model QueueItem {
+  id                String      @id @default(cuid())
+  userId            String
+  position          Int
+  status            QueueStatus @default(WAITING)
+  vmConfig          Json // Configuração da VM solicitada
+  estimatedWaitTime Int? // em minutos
+  createdAt         DateTime    @default(now())
+  startedAt         DateTime?
+  completedAt       DateTime?
+  errorMessage      String?
+  updatedAt         DateTime    @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, status]) // Um usuário só pode ter um item ativo na fila
+  @@map("queue_items")
+}
+
+// =============================================================================
+// MODELS DE ADMINISTRAÇÃO E LOGS
+// =============================================================================
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  resource   String
+  resourceId String?
+  details    Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}
+
+model SystemLog {
+  id        String   @id @default(cuid())
+  level     LogLevel @default(INFO)
+  service   String
+  message   String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@map("system_logs")
+}
+
+// =============================================================================
+// MODELS DE CONFIGURAÇÃO E MÉTRICAS
+// =============================================================================
+
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  type      String   @default("string") // string, number, boolean, json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("system_config")
+}
+
+model SystemMetrics {
+  id                String   @id @default(cuid())
+  timestamp         DateTime @default(now())
+  activeVMs         Int      @default(0)
+  queueLength       Int      @default(0)
+  totalUsers        Int      @default(0)
+  activeUsers       Int      @default(0)
+  cpuUsage          Float    @default(0)
+  memoryUsage       Float    @default(0)
+  diskUsage         Float    @default(0)
+  networkIO         Float    @default(0)
+  averageWaitTime   Int      @default(0) // em minutos
+  totalVMsCreated   Int      @default(0)
+
+  @@map("system_metrics")
+}
+
+// =============================================================================
+// MODELS DE WEBHOOKS E NOTIFICAÇÕES
+// =============================================================================
+
+model WebhookSubscription {
+  id            String   @id @default(cuid())
+  name          String
+  url           String
+  events        String[] // Array de eventos que o webhook escuta
+  secret        String?
+  enabled       Boolean  @default(true)
+  failureCount  Int      @default(0)
+  lastTriggered DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("webhook_subscriptions")
+}
+
+model WebhookDelivery {
+  id             String   @id @default(cuid())
+  subscriptionId String
+  eventType      String
+  payload        Json
+  responseStatus Int?
+  responseBody   String?
+  attempts       Int      @default(1)
+  delivered      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  deliveredAt    DateTime?
+
+  @@map("webhook_deliveries")
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum VMStatus {
+  CREATING
+  STARTING
+  RUNNING
+  STOPPING
+  STOPPED
+  FORMATTING
+  ERROR
+  DELETED
+}
+
+enum QueueStatus {
+  WAITING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum LogLevel {
+  ERROR
+  WARN
+  INFO
+  DEBUG
+}
+
+// =============================================================================
+// INDEXES PARA PERFORMANCE
+// =============================================================================
+
+// Index para consultas frequentes
+@@index([User.discordId])
+@@index([User.createdAt])
+@@index([VirtualMachine.userId])
+@@index([VirtualMachine.status])
+@@index([VirtualMachine.createdAt])
+@@index([QueueItem.userId])
+@@index([QueueItem.status])
+@@index([QueueItem.position])
+@@index([AuditLog.userId])
+@@index([AuditLog.action])
+@@index([AuditLog.createdAt])
+@@index([SystemLog.level])
+@@index([SystemLog.service])
+@@index([SystemLog.createdAt])
+@@index([SystemMetrics.timestamp])
+@@index([VMLog.vmId])
+@@index([VMLog.level])
+@@index([VMLog.createdAt])
